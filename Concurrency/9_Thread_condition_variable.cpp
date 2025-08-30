@@ -38,6 +38,12 @@ void Consumer() {
         cv.wait(ul, [] { return !g_data.empty(); });  
         // wait releases lock until condition is true (queue not empty)
         // avoids busy waiting
+        // 1. It releases the lock (ul → unique_lock) so the producer can acquire the mutex and put something into g_data.
+        // 2. It puts the consumer thread to sleep (not consuming CPU).
+        // 3. When producer pushes data and calls cv.notify_one(), the consumer wakes up.
+        // 4. It re-acquires the lock (ul) and checks the condition again:
+        // 5. If the queue is not empty, it continues.
+        // 6. If it’s still empty (spurious wakeups can happen), it goes back to waiting.
         int item = g_data.front();
         g_data.pop();
         std::cout << "[Consumer] Consumed: " << item << std::endl;
@@ -64,7 +70,7 @@ THEORY: Using condition_variable
 
 1. Motivation:
    - Without condition variables, threads would poll in a loop:
-     while(queue.empty()) { /* keep checking */ }
+     while(queue.empty()) {  keep checking  }
    - This wastes CPU (busy-waiting).
    - Condition variables let a thread sleep until notified.
 
@@ -97,7 +103,7 @@ THEORY: Using condition_variable
 EXAMPLES:
 
 Case 1: Busy waiting (bad)
-while(queue.empty()) { /* spin */ }
+while(queue.empty()) { }
 
 Case 2: With condition_variable (good)
 cv.wait(lock, []{ return !queue.empty(); });
